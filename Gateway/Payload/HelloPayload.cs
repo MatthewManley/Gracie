@@ -1,4 +1,5 @@
-﻿using Gracie.Models;
+﻿using Gracie.ETF;
+using Gracie.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -16,7 +17,7 @@ namespace Gracie.Gateway.Payload
         /// <summary>
         /// the interval (in milliseconds) the client should heartbeat with
         /// </summary>
-        [PropertyName("heartbeat_interval")]
+        [EtfProperty("heartbeat_interval")]
         public int HeartbeatInterval { get; private set; }
 
         public HelloPayload(int? sequenceNumber, string eventName) : base(Opcode.Hello, sequenceNumber, eventName) { }

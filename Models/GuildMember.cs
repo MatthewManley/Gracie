@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Numerics;
 
 namespace Gracie.Models
 {
@@ -21,7 +20,7 @@ namespace Gracie.Models
         /// <summary>
         /// list of role object ids
         /// </summary>
-        public List<BigInteger> Roles { get; set; }
+        public List<ulong> Roles { get; set; }
 
         /// <summary>
         /// when the user joined the guild
@@ -43,6 +42,6 @@ namespace Gracie.Models
         /// </summary>
         public bool Mute { get; set; }
 
-        public BigInteger? HoistedRole { get; set; }
+        public ulong? HoistedRole { get; set; }
     }
 }

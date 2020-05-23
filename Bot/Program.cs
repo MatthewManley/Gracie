@@ -1,8 +1,11 @@
-﻿using Gracie.Gateway;
+﻿using Gracie.ETF;
+using Gracie.Gateway;
+using Gracie.Gateway.Payload;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Net.WebSockets;
+using System.Numerics;
 using System.Threading.Tasks;
 
 namespace Bot

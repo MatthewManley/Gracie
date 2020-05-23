@@ -37,9 +37,15 @@ namespace Bot
             client.ReadyReceived += Client_ReadyReceived1; ;
             client.TypingStartReceived += Client_TypingStartReceived;
             client.GuildCreateReceived += Client_GuildCreateReceived;
+            client.MessageCreateReceived += Client_MessageCreateReceived;
             var uri = new Uri("wss://gateway.discord.gg/?v=6&encoding=etf"); //TODO:3 this shouldn't be hardcoded, it should come from the rest api
             await client.Connect(uri);
             await client.Recieve();
+        }
+
+        private Task Client_MessageCreateReceived(object sender, DataPayload<Gracie.Models.Message> messageCreatePayload)
+        {
+            return Task.CompletedTask;
         }
 
         private Task Client_GuildCreateReceived(object sender, GuildCreateEventPayload typingStartEventPayload)
@@ -76,12 +82,12 @@ namespace Bot
         private async Task HelloRecievedSendIdentify(object sender, HelloPayload payload)
         {
             logger.LogInformation("Sending heartbeat");
-            await client.Send(new HeartbeatPayload(lastSequenceNumber));
-            await client.Send(new IdentifyPayload
+            await client.Send(new HeartbeatPayload());
+            await client.Send(new DataPayload<IdentifyPayload>(new IdentifyPayload
             {
-                Token = Configuration["discordtoken"],
-                Intents = Intent.GuildMessages | Intent.DirectMessages | Intent.GuildVoiceStates
-            });
+                Intents = Intent.GuildMessages | Intent.DirectMessages,
+                Token = Configuration["discordtoken"]
+            }, Opcode.Identify));
         }
 
         private Task HelloRecievedSetupHeartbeat(object sender, HelloPayload payload)

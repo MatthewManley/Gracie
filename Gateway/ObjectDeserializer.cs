@@ -1,4 +1,6 @@
-﻿using Gracie.Models;
+﻿using Gracie.ETF;
+using Gracie.Gateway.Payload;
+using Gracie.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections;
@@ -31,13 +33,24 @@ namespace Gracie.Gateway
 
         public object DeserializePayload(Type t, List<(string, object)> data, int? sequenceNumber, string eventName)
         {
-            var trace = new StringBuilder().Append(t.Name);
-            var instance = Activator.CreateInstance(t, sequenceNumber, eventName);
-            if (data == null)
+            if (t.IsGenericType)
             {
+                var subType = t.GenericTypeArguments.First();
+                var trace = new StringBuilder().Append(t.Name).Append('<').Append(subType.Name).Append('>');
+                var subInstance = Deserialize(subType, data, trace);
+                var instance = Activator.CreateInstance(t, subInstance, sequenceNumber, eventName);
                 return instance;
             }
-            return Deserialize(t, data, instance, trace);
+            else
+            {
+                var trace = new StringBuilder().Append(t.Name);
+                var instance = Activator.CreateInstance(t, sequenceNumber, eventName);
+                if (data == null)
+                {
+                    return instance;
+                }
+                return Deserialize(t, data, instance, trace);
+            }
         }
 
         public object Deserialize(Type t, List<(string, object)> data, StringBuilder trace)
@@ -54,7 +67,7 @@ namespace Gracie.Gateway
             {
                 if (key.StartsWith('_'))
                     continue;
-                var p = propertyInfo.FirstOrDefault(x => x.GetCustomAttribute<PropertyName>()?.Name == key);
+                var p = propertyInfo.FirstOrDefault(x => x.GetCustomAttribute<EtfProperty>()?.Name == key);
                 var subtrace = new StringBuilder().Append(trace).Append('.').Append(key);
                 if (p == null)
                 {

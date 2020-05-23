@@ -6,24 +6,8 @@ using System.Text;
 
 namespace Gracie.Gateway.Payload
 {
-    public class HeartbeatPayload : SerializablePayload
+    public class HeartbeatPayload : DataPayload<int?>
     {
-        private readonly int? lastSequenceNumber;
-
-        public HeartbeatPayload(int? lastSequenceNumber) : base(Opcode.Heartbeat)
-        {
-            this.lastSequenceNumber = lastSequenceNumber;
-        }
-
-        public override bool HasData => true;
-
-        public override int SerializeData(byte[] buffer, int position)
-        {
-            if (lastSequenceNumber.HasValue)
-            {
-                return ETFSerializer.SerializeIntegerExt(buffer, position, lastSequenceNumber.Value);
-            }
-            return ETFSerializer.SerializeAtomExt(buffer, position, "nil");
-        }
+        public HeartbeatPayload(int? lastSequenceNumber = null) : base(lastSequenceNumber, Opcode.Heartbeat) { }
     }
 }

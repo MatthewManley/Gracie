@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Gracie.ETF;
 using Gracie.Models;
 using Microsoft.Extensions.Logging;
 
@@ -16,31 +17,31 @@ namespace Gracie.Gateway.Payload.Dispatch
         {
         }
 
-        [PropertyName("application")]
+        [EtfProperty("application")]
         public Application Application { get; private set; }
 
         /// <summary>
         /// the guilds the user is in
         /// </summary>
-        [PropertyName("guilds")]
+        [EtfProperty("guilds")]
         public IList<Guild> Guilds { get; private set; }
 
         /// <summary>
         /// gateway version
         /// </summary>
-        [PropertyName("v")]
+        [EtfProperty("v")]
         public int GatewayVersion { get; private set; }
 
         /// <summary>
         /// information about the user including email
         /// </summary>
-        [PropertyName("user")]
+        [EtfProperty("user")]
         public User User { get; private set; }
 
         /// <summary>
         /// used for resuming connections
         /// </summary>
-        [PropertyName("session_id")]
+        [EtfProperty("session_id")]
         public string SessionId { get; private set; }
     }
 }

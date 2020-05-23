@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Numerics;
-using System.Text;
+﻿using Gracie.ETF;
 
 namespace Gracie.Models
 {
@@ -13,49 +10,49 @@ namespace Gracie.Models
         /// <summary>
         /// role id
         /// </summary>
-        [PropertyName("id")]
-        public BigInteger Id { get; private set; }
+        [EtfProperty("id")]
+        public ulong Id { get; private set; }
 
         /// <summary>
         /// role name
         /// </summary>
-        [PropertyName("name")]
+        [EtfProperty("name")]
         public string Name { get; private set; }
 
         /// <summary>
         /// integer representation of hexadecimal color code
         /// </summary>
-        [PropertyName("color")]
+        [EtfProperty("color")]
         public int Color { get; private set; }
 
         /// <summary>
         /// if this role is pinned in the user listing
         /// </summary>
-        [PropertyName("hoist")]
+        [EtfProperty("hoist")]
         public bool Hoist { get; private set; }
 
         /// <summary>
         /// position of this role
         /// </summary>
-        [PropertyName("position")]
+        [EtfProperty("position")]
         public int Position { get; private set; }
 
         /// <summary>
         /// permission bit set
         /// </summary>
-        [PropertyName("permissions")]
+        [EtfProperty("permissions")]
         public int Permisions { get; private set; }
 
         /// <summary>
         /// whether this role is managed by an integration
         /// </summary>
-        [PropertyName("managed")]
+        [EtfProperty("managed")]
         public bool Managed { get; private set; }
 
         /// <summary>
         /// whether this role is mentionable
         /// </summary>
-        [PropertyName("mentionable")]
+        [EtfProperty("mentionable")]
         public bool Mentionable { get; private set; }
     }
 }

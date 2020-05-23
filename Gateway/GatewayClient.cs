@@ -1,6 +1,7 @@
 ﻿using Gracie.ETF;
 using Gracie.Gateway.Payload;
 using Gracie.Gateway.Payload.Dispatch;
+using Gracie.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -175,10 +176,11 @@ namespace Gracie.Gateway
                     }
                     break;
                 case "MESSAGE_CREATE":
-                    //if (MessageCreateRecieved != null)
-                    //{
-
-                    //}
+                    if (MessageCreateReceived != null)
+                    {
+                        var payload = objectDeserializer.DeserializePayload<DataPayload<Message>>(data, sequenceNumber, eventName);
+                        await MessageCreateReceived(this, payload);
+                    }
                     break;
                 default:
                     logger?.Log(LogLevel.Information, "Received unknown dispatch event: {eventName}", eventName);
@@ -186,11 +188,12 @@ namespace Gracie.Gateway
             }
         }
 
-        public async Task Send(SerializablePayload payload)
+        public async Task Send(Payload.Payload payload)
         {
             var buffer = new byte[1024*1024];
-            var size = payload.Serialize(buffer);
-            var segment = new ArraySegment<byte>(buffer, 0, size);
+            var test = ETFSerializer.ObjectToTerm(buffer, 0, payload);
+            var segment = new ArraySegment<byte>(buffer, 0, test);
+            var teststr1 = string.Join('\n', segment);
             await webSocket.SendAsync(segment, WebSocketMessageType.Binary, true, CancellationToken.None);
         }
 
@@ -226,5 +229,8 @@ namespace Gracie.Gateway
 
         public delegate Task GuildCreateReceivedHandler(object sender, GuildCreateEventPayload typingStartEventPayload);
         public event GuildCreateReceivedHandler GuildCreateReceived;
+
+        public delegate Task MessageCreateReceivedHandler(object sender, DataPayload<Message> messageCreatePayload);
+        public event MessageCreateReceivedHandler MessageCreateReceived;
     }
 }

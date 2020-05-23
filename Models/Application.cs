@@ -1,13 +1,13 @@
-﻿using System.Numerics;
+﻿using Gracie.ETF;
 
 namespace Gracie.Models
 {
     public class Application
     {
-        [PropertyName("flags")]
+        [EtfProperty("flags")]
         public int? Flags { get; private set; }
 
-        [PropertyName("id")]
-        public BigInteger Id { get; private set; }
+        [EtfProperty("id")]
+        public ulong Id { get; private set; }
     }
 }

@@ -5,4 +5,8 @@
     <RootNamespace>Gracie.Models</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ETF\ETF.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -20,18 +20,6 @@ namespace Gracie.Gateway.Payload
 
             items.Add(("op", SerializeItemHelpers.SerializeSmallIntegerExt((byte)Opcode)));
 
-            if (SequenceNumber.HasValue)
-            {
-                // TODO: Don't know what format sequence number comes in yet
-                //items.add(("s", 
-            }
-
-            if (!string.IsNullOrWhiteSpace(EventName))
-            {
-                // TODO: Don't know what format it sends event names yet
-                //items.add(("5", 
-            }
-
             if (HasData)
             {
                 items.Add(("d", SerializeData));

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Text;
 
 namespace Gracie.ETF
@@ -29,5 +30,8 @@ namespace Gracie.ETF
 
         public static ETFSerializer.SerializeItem SerializeBinaryExt(string value) =>
             SerializeGeneric(value, ETFSerializer.SerializeBinaryExt);
+
+        public static ETFSerializer.SerializeItem SerializeSmallBigExt(BigInteger value) =>
+            SerializeGeneric(value, ETFSerializer.SerializeSmallBigExt);
     }
 }

@@ -11,48 +11,36 @@ namespace Gracie.Gateway.Payload
     /// <summary>
     /// https://discord.com/developers/docs/topics/gateway#identify-identify-structure
     /// </summary>
-    public class IdentifyPayload : SerializablePayload
+    public class IdentifyPayload
     {
-        //TODO: large_threshold, shard, presence, guild_subscriptions
-
         /// <summary>
         /// authentication token
         /// </summary>
+        [EtfProperty("token")]
         public string Token { get; set; }
-        public static readonly string LibraryName = "Gracie v" + Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
-        public IdentifyPayload() : base(Opcode.Identify)
-        {
-        }
+        /// <summary>
+        /// connection properties
+        /// </summary>
+        [EtfProperty("properties")]
+        public ConnectionProperties Properties { get; set; } = new ConnectionProperties();
 
-        public string OperatingSystem { get; set; } = Environment.OSVersion.VersionString;
+        // TODO: compress
 
+        /// <summary>
+        /// value between 50 and 250, total number of members where the gateway will stop sending offline members in the guild member list
+        /// </summary>
+        [EtfProperty("large_threshold")]
+        public int? LargeThreshold { get; set; }
+
+        //TODO: shard
+        //TODO: presence
+        //TODO: guild_subscriptions
+
+        /// <summary>
+        /// the Gateway Intents you wish to receive
+        /// </summary>
+        [EtfProperty("intents")]
         public Intent? Intents { get; set; } = null;
-
-        public override bool HasData => true;
-
-        public override int SerializeData(byte[] buffer, int position)
-        {
-            var s = SerializeItemHelpers.SerializeBinaryExt(LibraryName);
-            var properties = new List<(string, ETFSerializer.SerializeItem)>
-            {
-                ("$os", SerializeItemHelpers.SerializeBinaryExt(OperatingSystem)),
-                ("$browser", s),
-                ("$device", s)
-            };
-
-            var items = new List<(string, ETFSerializer.SerializeItem)>
-            {
-                ("token", SerializeItemHelpers.SerializeBinaryExt(Token)),
-                ("properties", SerializeItemHelpers.SerializeMapExt(properties))
-            };
-
-            if (Intents.HasValue)
-            {
-                items.Add(("intents", SerializeItemHelpers.SerializeIntegerExt((int)Intents)));
-            }
-
-            return ETFSerializer.SerializeMapExt(buffer, position, items);
-        }
     }
 }

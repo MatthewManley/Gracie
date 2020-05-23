@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Gracie.Models
+namespace Gracie.ETF
 {
-    public sealed class PropertyName : Attribute
+    public sealed class EtfProperty : Attribute
     {
-        public PropertyName(string name)
+        public EtfProperty(string name, bool serializeIfNull = false)
         {
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -14,8 +14,10 @@ namespace Gracie.Models
             }
 
             Name = name;
+            SerializeIfNull = serializeIfNull;
         }
 
         public string Name { get; }
+        public bool SerializeIfNull { get; }
     }
 }
