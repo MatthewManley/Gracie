@@ -30,31 +30,32 @@ namespace Bot
         {
             using var scope = Services.CreateScope();
             client = scope.ServiceProvider.GetRequiredService<GatewayClient>();
-            client.HelloReceived += HelloRecievedSetupHeartbeat;
             client.HelloReceived += HelloRecievedSendIdentify;
+            client.HelloReceived += HelloRecievedSetupHeartbeat;
             client.HeartbeatAckReceived += Client_HeartbeatAckRecieved;
             client.NewSequenceNumber += Client_NewSequenceNumber;
-            client.ReadyReceived += Client_ReadyReceived1; ;
-            client.TypingStartReceived += Client_TypingStartReceived;
-            client.GuildCreateReceived += Client_GuildCreateReceived;
+            client.ReadyReceived += Client_ReadyReceived;
+            client.TypingStartReceived += Client_TypingStartReceived1;
             client.MessageCreateReceived += Client_MessageCreateReceived;
-            var uri = new Uri("wss://gateway.discord.gg/?v=6&encoding=etf"); //TODO:3 this shouldn't be hardcoded, it should come from the rest api
+            var uri = new Uri("wss://gateway.discord.gg/?v=6&encoding=etf"); //TODO: this shouldn't be hardcoded, it should come from the rest api
             await client.Connect(uri);
             await client.Recieve();
         }
 
+        private Task Client_TypingStartReceived1(object sender, DataPayload<TypingStartEventData> typingStartEventPayload)
+        {
+            throw new NotImplementedException();
+        }
+
+        private Task Client_ReadyReceived(object sender, DataPayload<ReadyEventData> readyPayload)
+        {
+            logger.LogInformation("Ready Recieved");
+            return Task.CompletedTask;
+        }
+
         private Task Client_MessageCreateReceived(object sender, DataPayload<Gracie.Models.Message> messageCreatePayload)
         {
-            return Task.CompletedTask;
-        }
-
-        private Task Client_GuildCreateReceived(object sender, GuildCreateEventPayload typingStartEventPayload)
-        {
-            return Task.CompletedTask;
-        }
-
-        private Task Client_TypingStartReceived(object sender, TypingStartEventPayload typingStartEventPayload)
-        {
+            logger.Log(LogLevel.Information, messageCreatePayload.Data.Content);
             return Task.CompletedTask;
         }
 
@@ -62,44 +63,52 @@ namespace Bot
         public int? lastSequenceNumber = null;
         private readonly ILogger<Startup> logger;
 
-        private Task Client_ReadyReceived1(object sender, ReadyEventPayload readyPayload)
-        {
-            return Task.CompletedTask;
-        }
-
         private Task Client_NewSequenceNumber(object sender, int sequenceNumber)
         {
             lastSequenceNumber = sequenceNumber;
             return Task.CompletedTask;
         }
 
-        private Task Client_HeartbeatAckRecieved(object sender, HeartbeatAckPayload payload)
+        private Task Client_HeartbeatAckRecieved(object sender, Payload payload)
         {
             logger.LogInformation("Heartbeat ACK Recieved");
             return Task.CompletedTask;
         }
 
-        private async Task HelloRecievedSendIdentify(object sender, HelloPayload payload)
+        private async Task HelloRecievedSendIdentify(object sender, DataPayload<HelloData> payload)
         {
-            logger.LogInformation("Sending heartbeat");
-            await client.Send(new HeartbeatPayload());
-            await client.Send(new DataPayload<IdentifyPayload>(new IdentifyPayload
+            logger.LogInformation("Hello Recieved");
+            await SendHeartbeat();
+            await client.Send(new DataPayload<IdentifyData>
             {
-                Intents = Intent.GuildMessages | Intent.DirectMessages,
-                Token = Configuration["discordtoken"]
-            }, Opcode.Identify));
+                Data = new IdentifyData
+                {
+                    GuildSubscriptions = false,
+                    Intents = Intent.GuildMessages | Intent.DirectMessages,
+                    Token = Configuration["discordtoken"]
+                },
+                Opcode = Opcode.Identify
+            });
         }
 
-        private Task HelloRecievedSetupHeartbeat(object sender, HelloPayload payload)
+        private async Task SendHeartbeat()
+        {
+            logger.LogInformation("Sending heartbeat");
+            await client.Send(new DataPayload<int?>
+            {
+                Data = lastSequenceNumber,
+                Opcode = Opcode.Heartbeat,
+            });
+        }
+
+        private Task HelloRecievedSetupHeartbeat(object sender, DataPayload<HelloData> payload)
         {
             var heartbeat = Task.Run(async delegate
             {
-                logger.LogInformation("Hello Recieved");
                 while (true)
                 {
-                    await Task.Delay(payload.HeartbeatInterval);
-                    logger.LogInformation("Sending heartbeat");
-                    await client.Send(new HeartbeatPayload(lastSequenceNumber));
+                    await Task.Delay(payload.Data.HeartbeatInterval);
+                    await SendHeartbeat();
                 }
             });
             return Task.CompletedTask;

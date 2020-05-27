@@ -12,10 +12,8 @@ namespace Gracie.Gateway.Payload.Dispatch
     /// Sent when a user starts typing in a channel
     /// https://discord.com/developers/docs/topics/gateway#typing-start
     /// </summary>
-    public class TypingStartEventPayload : Payload
+    public class TypingStartEventData
     {
-        public TypingStartEventPayload(int? sequenceNumber, string eventName) : base(Opcode.Dispatch, sequenceNumber, eventName) { }
-
         /// <summary>
         /// id of the channel
         /// </summary>

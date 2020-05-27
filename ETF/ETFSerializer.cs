@@ -21,12 +21,11 @@ namespace Gracie.ETF
             return 1 + SerializeMapExt(buffer, position + 1, map);
         }
 
-        public static List<(string, SerializeItem)> ObjectToMap(object obj)
+        public static IEnumerable<(string, SerializeItem)> ObjectToMap(object obj)
         {
             var properties = obj.GetType().GetProperties()
                 .Select(x => (x, x.GetCustomAttribute<EtfProperty>()))
-                .Where((x) => x.Item2 != null).ToList();
-            var result = new List<(string, SerializeItem)>();
+                .Where((x) => x.Item2 != null);
             foreach (var (property, propertyName) in properties)
             {
                 var t = property.PropertyType;
@@ -41,7 +40,7 @@ namespace Gracie.ETF
                     {
                         if (propertyName.SerializeIfNull)
                         {
-                            result.Add((propertyName.Name, SerializeItemHelpers.SerializeAtomExt("nil")));
+                            yield return (propertyName.Name, SerializeItemHelpers.SerializeAtomExt("nil"));
                         }
                         continue;
                     }
@@ -51,110 +50,107 @@ namespace Gracie.ETF
                     }
                 }
                 var tc = Type.GetTypeCode(t);
-                SerializeItem newSerializeItem = null;
+                //SerializeItem newSerializeItem = null;
                 switch (tc)
                 {
                     case TypeCode.Boolean:
                         {
                             var value = (bool)property.GetValue(obj) ? "true" : "false";
-                            newSerializeItem = SerializeItemHelpers.SerializeBinaryExt(value);
+                            var serializeItem = SerializeItemHelpers.SerializeBinaryExt(value);
+                            yield return (propertyName.Name, serializeItem);
                         }
                         break;
                     case TypeCode.Byte:
                         {
                             var value = (byte)property.GetValue(obj);
-                            newSerializeItem = SerializeItemHelpers.SerializeSmallIntegerExt(value);
+                            var serializeItem = SerializeItemHelpers.SerializeSmallIntegerExt(value);
+                            yield return (propertyName.Name, serializeItem);
                         }
-                        break;
-                    case TypeCode.Char:
-                        break;
-                    case TypeCode.DateTime:
-                        break;
-                    case TypeCode.DBNull:
-                        break;
-                    case TypeCode.Decimal:
-                        break;
-                    case TypeCode.Double:
-                        break;
-                    case TypeCode.Empty:
-                        break;
-                    case TypeCode.Int16:
                         break;
                     case TypeCode.Int32:
                         {
                             var value = (int)property.GetValue(obj);
-                            newSerializeItem = SerializeItemHelpers.SerializeIntegerExt(value);
-                        } 
+                            var serializeItem = SerializeItemHelpers.SerializeIntegerExt(value);
+                            yield return (propertyName.Name, serializeItem);
+                        }
                         break;
                     case TypeCode.Int64:
                         {
                             var value = (long)property.GetValue(obj);
                             var big = new BigInteger(value);
-                            newSerializeItem = SerializeItemHelpers.SerializeSmallBigExt(big);
+                            var serializeItem = SerializeItemHelpers.SerializeSmallBigExt(big);
+                            yield return (propertyName.Name, serializeItem);
                         }
                         break;
                     case TypeCode.Object:
                         {
                             var value = property.GetValue(obj);
-                            var valueMap = ObjectToMap(value);
-                            newSerializeItem = SerializeItemHelpers.SerializeMapExt(valueMap);
+                            if (value != null)
+                            {
+                                var valueMap = ObjectToMap(value);
+                                var serializeItem = SerializeItemHelpers.SerializeMapExt(valueMap);
+                                yield return (propertyName.Name, serializeItem);
+                            }
+                            else if (propertyName.SerializeIfNull)
+                            {
+                                var serializeItem = SerializeItemHelpers.SerializeAtomExt("nil");
+                                yield return (propertyName.Name, serializeItem);
+                            }
                         }
-                        break;
-                    case TypeCode.SByte:
-                        break;
-                    case TypeCode.Single:
                         break;
                     case TypeCode.String:
                         {
                             var value = (string)property.GetValue(obj);
-                            if (value is null)
+                            if (value != null)
                             {
-                                if (propertyName.SerializeIfNull)
-                                {
-                                    newSerializeItem = SerializeItemHelpers.SerializeAtomExt("nil");
-                                }
+                                var serializeItem = SerializeItemHelpers.SerializeBinaryExt(value);
+                                yield return (propertyName.Name, serializeItem);
                             }
-                            else
+                            else if (propertyName.SerializeIfNull)
                             {
-                                newSerializeItem = SerializeItemHelpers.SerializeBinaryExt(value);
+                                var serializeItem = SerializeItemHelpers.SerializeAtomExt("nil");
+                                yield return (propertyName.Name, serializeItem);
                             }
-                            break;
                         }
-                        break;
-                    case TypeCode.UInt16:
-                        break;
-                    case TypeCode.UInt32:
                         break;
                     case TypeCode.UInt64:
                         {
                             var value = (ulong)property.GetValue(obj);
                             var big = new BigInteger(value);
-                            newSerializeItem = SerializeItemHelpers.SerializeSmallBigExt(big);
+                            var serializeItem = SerializeItemHelpers.SerializeSmallBigExt(big);
+                            yield return (propertyName.Name, serializeItem);
                         }
                         break;
+                    case TypeCode.SByte:
+                    case TypeCode.Single:
+                    case TypeCode.UInt16:
+                    case TypeCode.UInt32:
+                    case TypeCode.Char:
+                    case TypeCode.DateTime:
+                    case TypeCode.DBNull:
+                    case TypeCode.Decimal:
+                    case TypeCode.Double:
+                    case TypeCode.Empty:
+                    case TypeCode.Int16:
                     default:
-                        break;
-                }
-                if (newSerializeItem != null)
-                {
-                    result.Add((propertyName.Name, newSerializeItem));
+                        throw new NotImplementedException();
                 }
             }
-            return result;
         }
 
-        public static int SerializeMapExt(byte[] buffer, int position, List<(string, SerializeItem)> items)
+        public static int SerializeMapExt(byte[] buffer, int position, IEnumerable<(string, SerializeItem)> items)
         {
             int length = 0;
             buffer[position] = ETFConstants.MAP_EXT;
-            length += 1;
-            var unsignedListLength = Convert.ToUInt32(items.Count);
-            length += SerializeUInt32(buffer, position + length, unsignedListLength);
+            length += 5;
+            uint count = 0;
             foreach (var (name, serializeItem) in items)
             {
+                count++;
                 length += SerializeBinaryExt(buffer, position + length, name);
                 length += serializeItem(buffer, position + length);
             }
+            SerializeUInt32(buffer, position + 1, count);
             return length;
         }
 
@@ -176,7 +172,7 @@ namespace Gracie.ETF
             length += 1;
             var unsignedStringLength = Convert.ToUInt16(value.Length);
             length += SerializeUInt16(buffer, position + length, unsignedStringLength);
-            length +=  ETFConstants.Latin1.GetBytes(value, 0, value.Length, buffer, position + length);
+            length += ETFConstants.Latin1.GetBytes(value, 0, value.Length, buffer, position + length);
             return length;
         }
 

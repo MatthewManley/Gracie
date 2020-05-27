@@ -55,11 +55,11 @@ namespace Gracie.ETF
             }
         }
 
-        public static List<(string, object)> DeserializeMap(byte[] buffer, ref int position)
+        public static Dictionary<string, object> DeserializeMap(byte[] buffer, ref int position)
         {
-            var mapItemCount = DeserializeUInt32(buffer, ref position);
-            var result = new List<(string, object)>();
-            for (uint i = 0; i < mapItemCount; i++)
+            var mapItemCount = Convert.ToInt32(DeserializeUInt32(buffer, ref position));
+            var result = new Dictionary<string, object>(mapItemCount);
+            for (var i = 0; i < mapItemCount; i++)
             {
                 string key;
                 var keyObj = Deserialize(buffer, ref position);
@@ -77,7 +77,7 @@ namespace Gracie.ETF
                     throw new Exception("Unexpected format for map key");
                 }
                 var value = Deserialize(buffer, ref position);
-                result.Add((key, value));
+                result.Add(key, value);
             }
             return result;
         }

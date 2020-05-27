@@ -16,7 +16,7 @@ namespace Gracie.ETF
             };
         }
 
-        public static ETFSerializer.SerializeItem SerializeMapExt(List<(string, ETFSerializer.SerializeItem)> items) =>
+        public static ETFSerializer.SerializeItem SerializeMapExt(IEnumerable<(string, ETFSerializer.SerializeItem)> items) =>
             SerializeGeneric(items, ETFSerializer.SerializeMapExt);
 
         public static ETFSerializer.SerializeItem SerializeAtomExt(string value) =>

@@ -25,42 +25,54 @@ namespace Gracie.Gateway
             this.textEncoding = textEncoding;
         }
 
-        public T DeserializePayload<T>(List<(string, object)> data, int? sequenceNumber, string eventName) where T : Payload.Payload
+        //public T DeserializePayload<T>(List<(string, object)> data, int? sequenceNumber, string eventName) where T : Payload.Payload
+        //{
+        //    var type = typeof(T);
+        //    return (T)DeserializePayload(type, data, sequenceNumber, eventName);
+        //}
+
+        //public object DeserializePayload(Type t, List<(string, object)> data, int? sequenceNumber, string eventName)
+        //{
+        //    if (t.IsGenericType)
+        //    {
+        //        var subType = t.GenericTypeArguments.First();
+        //        var trace = new StringBuilder().Append(t.Name).Append('<').Append(subType.Name).Append('>');
+        //        var subInstance = Deserialize(subType, data, trace);
+        //        var instance = Activator.CreateInstance(t, subInstance, sequenceNumber, eventName);
+        //        return instance;
+        //    }
+        //    else
+        //    {
+        //        var trace = new StringBuilder().Append(t.Name);
+        //        var instance = Activator.CreateInstance(t, sequenceNumber, eventName);
+        //        if (data == null)
+        //        {
+        //            return instance;
+        //        }
+        //        return Deserialize(t, data, instance, trace);
+        //    }
+        //}
+
+
+
+        public T Deserialize<T>(Dictionary<string, object> data)
         {
             var type = typeof(T);
-            return (T)DeserializePayload(type, data, sequenceNumber, eventName);
+            var trace = new StringBuilder(type.Name);
+            return (T)Deserialize(type, data, trace);
         }
 
-        public object DeserializePayload(Type t, List<(string, object)> data, int? sequenceNumber, string eventName)
+        public object Deserialize(Type t, Dictionary<string, object> data, StringBuilder trace = null)
         {
-            if (t.IsGenericType)
-            {
-                var subType = t.GenericTypeArguments.First();
-                var trace = new StringBuilder().Append(t.Name).Append('<').Append(subType.Name).Append('>');
-                var subInstance = Deserialize(subType, data, trace);
-                var instance = Activator.CreateInstance(t, subInstance, sequenceNumber, eventName);
-                return instance;
-            }
-            else
-            {
-                var trace = new StringBuilder().Append(t.Name);
-                var instance = Activator.CreateInstance(t, sequenceNumber, eventName);
-                if (data == null)
-                {
-                    return instance;
-                }
-                return Deserialize(t, data, instance, trace);
-            }
-        }
-
-        public object Deserialize(Type t, List<(string, object)> data, StringBuilder trace)
-        {
-            var subtrace = new StringBuilder().Append(trace).Append('.').Append(t.Name);
+            var subtrace = new StringBuilder();
+            if (trace != null)
+                subtrace.Append(trace).Append('.');
+            subtrace.Append(t.Name);
             var instance = Activator.CreateInstance(t);
             return Deserialize(t, data, instance, subtrace);
         }
 
-        public object Deserialize(Type t, List<(string, object)> data, object instance, StringBuilder trace)
+        private  object Deserialize(Type t, Dictionary<string, object> data, object instance, StringBuilder trace)
         {
             var propertyInfo = t.GetProperties();
             foreach (var (key, value) in data)
@@ -91,6 +103,7 @@ namespace Gracie.Gateway
         private IEnumerable<Handle> HandleOrder()
         {
             yield return HandleNullableTypes;
+            yield return HandleEnumTypes;
             yield return HandleSameTypes;
             yield return HandleBigIntToUlong;
             yield return HandleByteToInt;
@@ -136,6 +149,16 @@ namespace Gracie.Gateway
                     return true;
                 }
                 var subType = t.GenericTypeArguments.First();
+                return HandleTypes(subType, value, trace, ref result);
+            }
+            return NextHelper(t, value, trace, ref result, nexts);
+        }
+
+        private bool HandleEnumTypes(Type t, object value, StringBuilder trace, ref object result, IEnumerator<Handle> nexts)
+        {
+            if (t.BaseType == typeof(Enum))
+            {
+                var subType = Enum.GetUnderlyingType(t);
                 return HandleTypes(subType, value, trace, ref result);
             }
             return NextHelper(t, value, trace, ref result, nexts);
@@ -226,7 +249,7 @@ namespace Gracie.Gateway
 
         private bool HandleObjectType(Type t, object value, StringBuilder trace, ref object result, IEnumerator<Handle> nexts)
         {
-            if (value is List<(string, object)> sublist)
+            if (value is Dictionary<string, object> sublist)
             {
                 result = Deserialize(t, sublist, trace);
                 return true;

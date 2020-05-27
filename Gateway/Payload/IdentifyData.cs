@@ -11,7 +11,7 @@ namespace Gracie.Gateway.Payload
     /// <summary>
     /// https://discord.com/developers/docs/topics/gateway#identify-identify-structure
     /// </summary>
-    public class IdentifyPayload
+    public class IdentifyData
     {
         /// <summary>
         /// authentication token
@@ -33,9 +33,33 @@ namespace Gracie.Gateway.Payload
         [EtfProperty("large_threshold")]
         public int? LargeThreshold { get; set; }
 
-        //TODO: shard
+
+        public int? ShardId { get; set; } = null;
+        public int? NumShards { get; set; } = null;
+
+        [EtfProperty("shard")]
+        public List<int> Shard
+        {
+            get
+            {
+                if (ShardId is null || NumShards is null)
+                {
+                    return null;
+                }
+                else
+                {
+                    return new List<int>() { ShardId.Value, NumShards.Value };
+                }
+            }
+        }
         //TODO: presence
         //TODO: guild_subscriptions
+
+        /// <summary>
+        /// enables dispatching of guild subscription events (presence and typing events)	
+        /// </summary>
+        [EtfProperty("guild_subscriptions")]
+        public bool? GuildSubscriptions { get; set; }
 
         /// <summary>
         /// the Gateway Intents you wish to receive

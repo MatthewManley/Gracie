@@ -7,21 +7,15 @@ using System.Text;
 
 namespace Gracie.Gateway.Payload
 {
-    public abstract class Payload
+    public class Payload
     {
         [EtfProperty("op")]
-        public Opcode Opcode { get; }
+        public Opcode Opcode { get; set; }
 
         [EtfProperty("s")]
-        public int? SequenceNumber { get; }
+        public int? SequenceNumber { get; set; }
 
         [EtfProperty("t")]
-        public string EventName { get; }
-        protected Payload(Opcode opcode, int? sequenceNumber = null, string eventName = null)
-        {
-            Opcode = opcode;
-            SequenceNumber = sequenceNumber;
-            EventName = eventName;
-        }
+        public string EventName { get; set; }
     }
 }

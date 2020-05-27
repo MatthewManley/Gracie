@@ -87,58 +87,39 @@ namespace Gracie.Gateway
         {
             // Here is a nice list of gateway events: https://discord.com/developers/docs/topics/gateway#commands-and-events-gateway-events
             var result = BeginParse(buffer);
-            List<(string, object)> dataDict = null;
-            Opcode? opcode = null;
-            int? sequenceNumber = null;
-            string eventName = null;
-            foreach (var (key, value) in result)
-            {
-                switch (key)
-                {
-                    case "op":
-                        opcode = (Opcode)value;
-                        break;
-                    case "d":
-                        dataDict = CastHelpers.SimpleCast<List<(string, object)>>(value);
-                        break;
-                    case "s":
-                        sequenceNumber = CastHelpers.IntCast(value);
-                        break;
-                    case "t":
-                        eventName = CastHelpers.SimpleCast<string>(value);
-                        break;
-                    default:
-                        if (!key.StartsWith('_'))
-                            logger.Log(LogLevel.Information, "Unkown item in payload: {value}", key);
-                        break;
-                }
-            }
-            var trace = new StringBuilder().Append("Payload");
+            var opcode = (Opcode)result["op"];
+            var sequenceNumber = NumToInt(result["s"]);
+            var eventName = (string)result["t"];
             if (NewSequenceNumber != null && sequenceNumber.HasValue)
             {
                 await NewSequenceNumber(this, sequenceNumber.Value);
             }
             switch (opcode)
             {
+                case Opcode.Dispatch:
+                    await DeserializeDispatch(result, eventName);
+                    break;
                 case Opcode.Hello:
                     if (HelloReceived != null)
                     {
-                        var payload = objectDeserializer.DeserializePayload<HelloPayload>(dataDict, sequenceNumber, eventName);
+                        var payload = objectDeserializer.Deserialize<DataPayload<HelloData>>(result);
                         await HelloReceived(this, payload);
                     }
                     break;
                 case Opcode.HeartbeatACK:
                     if (HeartbeatAckReceived != null)
                     {
-                        var payload = objectDeserializer.DeserializePayload<HeartbeatAckPayload>(dataDict, sequenceNumber, eventName);
+                        var payload = objectDeserializer.Deserialize<Payload.Payload>(result);
                         await HeartbeatAckReceived(this, payload);
                     }
                     break;
-                case Opcode.Dispatch:
-                    await DeserializeDispatch(dataDict, sequenceNumber, eventName);
-                    break;
                 case Opcode.Heartbeat:
-                case Opcode.Identify:
+                    if (HeartbeatReceived != null)
+                    {
+                        var payload = objectDeserializer.Deserialize<DataPayload<int?>>(result);
+                        await HeartbeatReceived(this, payload);
+                    }
+                    break;
                 case Opcode.PresenceUpdate:
                 case Opcode.VoiceStateUpdate:
                 case Opcode.Resume:
@@ -151,22 +132,39 @@ namespace Gracie.Gateway
             }
         }
 
+        private int? NumToInt(object value)
+        {
+            if (value is null)
+            {
+                return null;
+            }
+            else if (value is int intVal)
+            {
+                return intVal;
+            }
+            else if (value is byte byteVal)
+            {
+                return Convert.ToInt32(byteVal);
+            }
+            throw new NotImplementedException();
+        }
 
-        private async Task DeserializeDispatch(List<(string, object)> data, int? sequenceNumber, string eventName)
+
+        private async Task DeserializeDispatch(Dictionary<string, object> data, string eventName)
         {
             switch (eventName)
             {
                 case "READY":
                     if (ReadyReceived != null)
                     {
-                        var payload = objectDeserializer.DeserializePayload<ReadyEventPayload>(data, sequenceNumber, eventName);
+                        var payload = objectDeserializer.Deserialize<DataPayload<ReadyEventData>>(data);
                         await ReadyReceived(this, payload);
                     }
                     break;
                 case "TYPING_START":
                     if (TypingStartReceived != null)
                     {
-                        var payload = objectDeserializer.DeserializePayload<TypingStartEventPayload>(data, sequenceNumber, eventName);
+                        var payload = objectDeserializer.Deserialize<DataPayload<TypingStartEventData>>(data);
                         await TypingStartReceived(this, payload);
                     }
                     break;
@@ -178,7 +176,7 @@ namespace Gracie.Gateway
                 case "MESSAGE_CREATE":
                     if (MessageCreateReceived != null)
                     {
-                        var payload = objectDeserializer.DeserializePayload<DataPayload<Message>>(data, sequenceNumber, eventName);
+                        var payload = objectDeserializer.Deserialize<DataPayload<Message>>(data);
                         await MessageCreateReceived(this, payload);
                     }
                     break;
@@ -190,16 +188,15 @@ namespace Gracie.Gateway
 
         public async Task Send(Payload.Payload payload)
         {
-            var buffer = new byte[1024*1024];
-            var test = ETFSerializer.ObjectToTerm(buffer, 0, payload);
-            var segment = new ArraySegment<byte>(buffer, 0, test);
-            var teststr1 = string.Join('\n', segment);
+            var buffer = new byte[4096]; // 4096 is the max payload length that can be sent to the gateway
+            var length = ETFSerializer.ObjectToTerm(buffer, 0, payload);
+            var segment = new ArraySegment<byte>(buffer, 0, length);
             await webSocket.SendAsync(segment, WebSocketMessageType.Binary, true, CancellationToken.None);
         }
 
 
         //TODO: move to etf namespace
-        public static List<(string, object)> BeginParse(byte[] buffer)
+        public static Dictionary<string, object> BeginParse(byte[] buffer)
         {
 
             if (buffer[0] != ETFConstants.FORMAT_VERSION ||
@@ -212,22 +209,25 @@ namespace Gracie.Gateway
             return ETFDeserializer.DeserializeMap(buffer, ref position);
         }
 
-        public delegate Task HelloReceivedHandler(object sender, HelloPayload payload);
+        public delegate Task HelloReceivedHandler(object sender, DataPayload<HelloData> payload);
         public event HelloReceivedHandler HelloReceived;
 
-        public delegate Task HeartbeatAckReceivedHandler(object sender, HeartbeatAckPayload payload);
+        public delegate Task HeartbeatReceiedHandler(object sender, Payload.Payload payload);
+        public event HeartbeatReceiedHandler HeartbeatReceived;
+
+        public delegate Task HeartbeatAckReceivedHandler(object sender, Payload.Payload payload);
         public event HeartbeatAckReceivedHandler HeartbeatAckReceived;
 
         public delegate Task NewSequenceNumberHandler(object sender, int sequenceNumber);
         public event NewSequenceNumberHandler NewSequenceNumber;
 
-        public delegate Task ReadyReceivedHandler(object sender, ReadyEventPayload readyPayload);
+        public delegate Task ReadyReceivedHandler(object sender, DataPayload<ReadyEventData> readyPayload);
         public event ReadyReceivedHandler ReadyReceived;
 
-        public delegate Task TypingStartReceivedHandler(object sender, TypingStartEventPayload typingStartEventPayload);
+        public delegate Task TypingStartReceivedHandler(object sender, DataPayload<TypingStartEventData> typingStartEventPayload);
         public event TypingStartReceivedHandler TypingStartReceived;
 
-        public delegate Task GuildCreateReceivedHandler(object sender, GuildCreateEventPayload typingStartEventPayload);
+        public delegate Task GuildCreateReceivedHandler(object sender, DataPayload<TypingStartEventData> typingStartEventPayload);
         public event GuildCreateReceivedHandler GuildCreateReceived;
 
         public delegate Task MessageCreateReceivedHandler(object sender, DataPayload<Message> messageCreatePayload);
