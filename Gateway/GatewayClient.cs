@@ -117,7 +117,8 @@ namespace Gracie.Gateway
                 { "MESSAGE_UPDATE",                 BuildEvent(() => MessageUpdateReceived) },
                 { "MESSAGE_REACTION_ADD",           BuildEvent(() => MessageReactionAddReceived) },
                 { "MESSAGE_REACTION_REMOVE",        BuildEvent(() => MessageReactionRemoveReceived) },
-                { "MESSAGE_REACTION_REMOVE_ALL",    BuildEvent(() => MessageReactionRemoveReceived) }
+                { "MESSAGE_REACTION_REMOVE_ALL",    BuildEvent(() => MessageReactionRemoveReceived) },
+                { "MESSAGE_REACTION_REMOVE_EMOJI",  BuildEvent(() => MessageReactionRemoveEmojiReceived) }
             };
         }
 
@@ -143,5 +144,6 @@ namespace Gracie.Gateway
         public event GatewayEventHandler<GatewayDataPayload<MessageReactionAdd>> MessageReactionAddReceived;
         public event GatewayEventHandler<GatewayDataPayload<MessageReactionRemove>> MessageReactionRemoveReceived;
         public event GatewayEventHandler<GatewayDataPayload<MessageReactionRemoveAll>> MessageReactionRemoveAllreceived;
+        public event GatewayEventHandler<GatewayDataPayload<MessageReactionRemoveEmoji>> MessageReactionRemoveEmojiReceived;
     }
 }
