@@ -3,10 +3,7 @@ using Gracie.Models;
 
 namespace Gracie.Gateway.EventData
 {
-    /// <summary>
-    /// https://discord.com/developers/docs/topics/gateway#message-reaction-add
-    /// </summary>
-    public class MessageReactionAdd
+    public class MessageReactionRemove
     {
         /// <summary>
         /// the id of the user
@@ -31,12 +28,6 @@ namespace Gracie.Gateway.EventData
         /// </summary>
         [EtfProperty("guild_id")]
         public ulong? GuildId { get; set; }
-
-        /// <summary>
-        /// the member who reacted if this happened in a guild
-        /// </summary>
-        [EtfProperty("member")]
-        public GuildMember Member { get; set; }
 
         /// <summary>
         /// the emoji used to react
