@@ -85,10 +85,11 @@ namespace Gracie.Gateway
         }
 
 
-        private DispatchEventHandler BuildEvent<T>(GatewayEventHandler<T> eventToCall)
+        private DispatchEventHandler BuildEvent<T>(Func<GatewayEventHandler<T>> eventGetter)
         {
             return async (Dictionary<string, object> data, CancellationToken cancellationToken) =>
             {
+                var eventToCall = eventGetter();
                 if (eventToCall != null)
                 {
                     var payload = objectDeserializer.Deserialize<T>(data);
@@ -101,15 +102,17 @@ namespace Gracie.Gateway
         {
             return new Dictionary<string, DispatchEventHandler>
             {
-                { "READY", BuildEvent(ReadyReceived) },
-                { "TYPING_START", BuildEvent(TypingStartReceived) },
-                { "GUILD_CREATE", BuildEvent(GuildCreateReceived) },
-                { "MESSAGE_CREATE", BuildEvent(MessageCreateReceived) },
-                { "VOICE_SERVER_UPDATE", BuildEvent(VoiceServerUpdateReceived) },
-                { "VOICE_STATE_UPDATE", BuildEvent(VoiceStateUpdateReceived) },
-                { "USER_UPDATE", BuildEvent(UserUpdateReceived) },
-                { "WEBHOOKS_UPDATE", BuildEvent(WebhooksUpdateReceived) },
-                { "PRESENCE_UPDATE", BuildEvent(PresenceUpdateReceived) }
+                { "READY", BuildEvent(() => ReadyReceived) },
+                { "TYPING_START", BuildEvent(() => TypingStartReceived) },
+                { "GUILD_CREATE", BuildEvent(() => GuildCreateReceived) },
+                { "MESSAGE_CREATE", BuildEvent(() => MessageCreateReceived) },
+                { "VOICE_SERVER_UPDATE", BuildEvent(() => VoiceServerUpdateReceived) },
+                { "VOICE_STATE_UPDATE", BuildEvent(() => VoiceStateUpdateReceived) },
+                { "USER_UPDATE", BuildEvent(() => UserUpdateReceived) },
+                { "WEBHOOKS_UPDATE", BuildEvent(() => WebhooksUpdateReceived) },
+                { "PRESENCE_UPDATE", BuildEvent(() => PresenceUpdateReceived) },
+                { "MESSAGE_DELETE", BuildEvent(() => MessageDeleteReceived) },
+                { "MESSAGE_DELETE_BULK", BuildEvent(() => MessageDeleteBulkReceived) }
             };
         }
 
@@ -129,5 +132,7 @@ namespace Gracie.Gateway
         public event GatewayEventHandler<GatewayDataPayload<User>> UserUpdateReceived;
         public event GatewayEventHandler<GatewayDataPayload<WebhooksUpdate>> WebhooksUpdateReceived;
         public event GatewayEventHandler<GatewayDataPayload<PresenceUpdate>> PresenceUpdateReceived;
+        public event GatewayEventHandler<GatewayDataPayload<MessageDelete>> MessageDeleteReceived;
+        public event GatewayEventHandler<GatewayDataPayload<MessageDeleteBulk>> MessageDeleteBulkReceived;
     }
 }
