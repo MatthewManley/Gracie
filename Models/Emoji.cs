@@ -12,7 +12,7 @@ namespace Gracie.Models
         /// emoji id
         /// </summary>
         [EtfProperty("id")]
-        public ulong Id { get; private set; }
+        public ulong? Id { get; private set; }
 
         /// <summary>
         /// emoji name
