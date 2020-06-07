@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace Gracie.Gateway.Payload
+namespace Gracie.Gateway
 {
     /// <summary>
     /// https://discord.com/developers/docs/topics/gateway#gateway-intents

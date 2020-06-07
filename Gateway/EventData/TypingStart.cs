@@ -1,18 +1,14 @@
 ﻿using Gracie.ETF;
 using Gracie.Models;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Text;
 
-namespace Gracie.Gateway.Payload.Dispatch
+namespace Gracie.Gateway.EventData
 {
     /// <summary>
     /// Sent when a user starts typing in a channel
     /// https://discord.com/developers/docs/topics/gateway#typing-start
     /// </summary>
-    public class TypingStartEventData
+    public class TypingStart
     {
         /// <summary>
         /// id of the channel

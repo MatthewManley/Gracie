@@ -1,10 +1,8 @@
 ﻿using Gracie.ETF;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 
-namespace Gracie.Gateway.Payload
+namespace Gracie.Gateway.EventData
 {
     public class ConnectionProperties
     {

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Gracie.Gateway.Payload
+﻿namespace Gracie.Gateway
 {
     public enum Opcode : byte
     {

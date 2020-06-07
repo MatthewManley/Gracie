@@ -1,17 +1,12 @@
 ﻿using Gracie.ETF;
-using Gracie.Gateway.Payload;
-using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Runtime.Serialization;
-using System.Text;
 
-namespace Gracie.Gateway.Payload
+namespace Gracie.Gateway.EventData
 {
     /// <summary>
     /// https://discord.com/developers/docs/topics/gateway#identify-identify-structure
     /// </summary>
-    public class IdentifyData
+    public class Identify
     {
         /// <summary>
         /// authentication token

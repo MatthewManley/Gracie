@@ -1,123 +1,63 @@
-﻿using Gracie.ETF;
-using Gracie.Gateway.Payload;
-using Gracie.Gateway.Payload.Dispatch;
+﻿using Gracie.Core;
+using Gracie.Gateway.EventData;
 using Gracie.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Gracie.Gateway
 {
-    public class GatewayClient
+    public class GatewayClient : BaseClient
     {
-        private readonly ClientWebSocket webSocket;
         private readonly ILogger<GatewayClient> logger;
         private readonly ObjectDeserializer objectDeserializer;
+        private readonly Dictionary<string, DispatchEventHandler> dispatchEventHandlers;
 
-        // TODO: make these configurable
-        private readonly SemaphoreSlim semaphore = new SemaphoreSlim(10);
-        private const int DeserializeAndRunTimeout = 20000;
-        private readonly bool ShouldTimeout = false;
-
-        public GatewayClient(ClientWebSocket webSocket, ILogger<GatewayClient> logger, ObjectDeserializer objectDeserializer)
+        public GatewayClient(ClientWebSocket webSocket, SemaphoreSlim semaphoreSlim, int bufferSize, ILogger<GatewayClient> logger, ObjectDeserializer objectDeserializer, int? taskTimeout = null) : base(webSocket, semaphoreSlim, bufferSize, logger, taskTimeout)
         {
-            this.webSocket = webSocket;
+            NewPayloadReceived += GatewayClient_NewPayloadReceived;
+            WebSocketClosed += WebSocket_WebSocketClosed;
             this.logger = logger;
             this.objectDeserializer = objectDeserializer;
+            dispatchEventHandlers = BuildDispatchEventDict();
         }
 
-        public async Task Connect(Uri uri, CancellationToken cancellationToken = default)
+        private Task WebSocket_WebSocketClosed(object sender, WebSocketReceiveResult receiveResult, byte[] buffer, CancellationToken cancellation = default)
         {
-            await webSocket.ConnectAsync(uri, cancellationToken);
+            logger.LogError("Connection closed", receiveResult.CloseStatusDescription);
+            return Task.CompletedTask;
         }
 
-        public async Task Recieve(CancellationToken cancellationToken = default)
+        private async Task GatewayClient_NewPayloadReceived(object sender, Dictionary<string, object> result, int? opcode, int? sequenceNumber, string eventName, CancellationToken cancellationToken)
         {
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                var buffer = new byte[1024 * 1024];
-                var segment = new ArraySegment<byte>(buffer);
-                var recieveResult = await webSocket.ReceiveAsync(segment, cancellationToken);
-                if (recieveResult.MessageType == WebSocketMessageType.Close)
-                {
-                    logger.LogError("Connection closed", recieveResult.CloseStatusDescription);
-                    return;
-                }
-                if (!recieveResult.EndOfMessage)
-                {
-                    //TODO: Custom exception or allow messages to be parsed in multiple packets
-                    throw new Exception("Didn't recieve entire message in one packet");
-                }
-                if (recieveResult.MessageType == WebSocketMessageType.Text)
-                {
-                    throw new Exception("Expected binary message type");
-                }
-                await semaphore.WaitAsync(cancellationToken);
-
-                _ = Task.Run(async () =>
-                {
-                    CancellationToken token;
-                    if (ShouldTimeout)
-                    {
-                        token = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, new CancellationTokenSource(10000).Token).Token;
-                    }
-                    else
-                    {
-                        token = cancellationToken;
-                    }
-                    try
-                    {
-                        await DeserializeMessage(buffer, token);
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
-                });
-            }
-        }
-
-        private async Task DeserializeMessage(byte[] buffer, CancellationToken cancellationToken)
-        {
-            // Here is a nice list of gateway events: https://discord.com/developers/docs/topics/gateway#commands-and-events-gateway-events
-            var result = BeginParse(buffer);
-            var opcode = (Opcode)result["op"];
-            var sequenceNumber = NumToInt(result["s"]);
-            var eventName = (string)result["t"];
-            if (NewSequenceNumber != null && sequenceNumber.HasValue)
-            {
-                await NewSequenceNumber(this, sequenceNumber.Value);
-            }
-            switch (opcode)
+            switch ((Opcode)opcode)
             {
                 case Opcode.Dispatch:
-                    await DeserializeDispatch(result, eventName);
+                    await DeserializeDispatch(result, eventName, cancellationToken);
                     break;
                 case Opcode.Hello:
                     if (HelloReceived != null)
                     {
-                        var payload = objectDeserializer.Deserialize<DataPayload<HelloData>>(result);
-                        await HelloReceived(this, payload);
+                        var payload = objectDeserializer.Deserialize<GatewayDataPayload<Hello>>(result);
+                        await HelloReceived(this, payload, cancellationToken);
                     }
                     break;
                 case Opcode.HeartbeatACK:
                     if (HeartbeatAckReceived != null)
                     {
-                        var payload = objectDeserializer.Deserialize<Payload.Payload>(result);
-                        await HeartbeatAckReceived(this, payload);
+                        var payload = objectDeserializer.Deserialize<GatewayPayload>(result);
+                        await HeartbeatAckReceived(this, payload, cancellationToken);
                     }
                     break;
                 case Opcode.Heartbeat:
                     if (HeartbeatReceived != null)
                     {
-                        var payload = objectDeserializer.Deserialize<DataPayload<int?>>(result);
-                        await HeartbeatReceived(this, payload);
+                        var payload = objectDeserializer.Deserialize<GatewayDataPayload<int?>>(result);
+                        await HeartbeatReceived(this, payload, cancellationToken);
                     }
                     break;
                 case Opcode.PresenceUpdate:
@@ -132,105 +72,62 @@ namespace Gracie.Gateway
             }
         }
 
-        private int? NumToInt(object value)
+        private async Task DeserializeDispatch(Dictionary<string, object> data, string eventName, CancellationToken cancellationToken)
         {
-            if (value is null)
+            if (dispatchEventHandlers.TryGetValue(eventName, out var eventHandler))
             {
-                return null;
+                await eventHandler(data, cancellationToken);
             }
-            else if (value is int intVal)
+            else
             {
-                return intVal;
+                logger?.Log(LogLevel.Information, "Received unknown dispatch event: {eventName}", eventName);
             }
-            else if (value is byte byteVal)
-            {
-                return Convert.ToInt32(byteVal);
-            }
-            throw new NotImplementedException();
         }
 
 
-        private async Task DeserializeDispatch(Dictionary<string, object> data, string eventName)
+        private DispatchEventHandler BuildEvent<T>(GatewayEventHandler<T> eventToCall)
         {
-            switch (eventName)
+            return async (Dictionary<string, object> data, CancellationToken cancellationToken) =>
             {
-                case "READY":
-                    if (ReadyReceived != null)
-                    {
-                        var payload = objectDeserializer.Deserialize<DataPayload<ReadyEventData>>(data);
-                        await ReadyReceived(this, payload);
-                    }
-                    break;
-                case "TYPING_START":
-                    if (TypingStartReceived != null)
-                    {
-                        var payload = objectDeserializer.Deserialize<DataPayload<TypingStartEventData>>(data);
-                        await TypingStartReceived(this, payload);
-                    }
-                    break;
-                case "GUILD_CREATE":
-                    if (GuildCreateReceived != null)
-                    {
-                    }
-                    break;
-                case "MESSAGE_CREATE":
-                    if (MessageCreateReceived != null)
-                    {
-                        var payload = objectDeserializer.Deserialize<DataPayload<Message>>(data);
-                        await MessageCreateReceived(this, payload);
-                    }
-                    break;
-                default:
-                    logger?.Log(LogLevel.Information, "Received unknown dispatch event: {eventName}", eventName);
-                    break;
-            }
+                if (eventToCall != null)
+                {
+                    var payload = objectDeserializer.Deserialize<T>(data);
+                    await eventToCall(this, payload, cancellationToken);
+                }
+            };
         }
 
-        public async Task Send(Payload.Payload payload)
+        private Dictionary<string, DispatchEventHandler> BuildDispatchEventDict()
         {
-            var buffer = new byte[4096]; // 4096 is the max payload length that can be sent to the gateway
-            var length = ETFSerializer.ObjectToTerm(buffer, 0, payload);
-            var segment = new ArraySegment<byte>(buffer, 0, length);
-            await webSocket.SendAsync(segment, WebSocketMessageType.Binary, true, CancellationToken.None);
-        }
-
-
-        //TODO: move to etf namespace
-        public static Dictionary<string, object> BeginParse(byte[] buffer)
-        {
-
-            if (buffer[0] != ETFConstants.FORMAT_VERSION ||
-                buffer[1] != ETFConstants.MAP_EXT)
+            return new Dictionary<string, DispatchEventHandler>
             {
-                //TODO: custom exception
-                throw new Exception("Invalid ETF format");
-            }
-            int position = 2;
-            return ETFDeserializer.DeserializeMap(buffer, ref position);
+                { "READY", BuildEvent(ReadyReceived) },
+                { "TYPING_START", BuildEvent(TypingStartReceived) },
+                { "GUILD_CREATE", BuildEvent(GuildCreateReceived) },
+                { "MESSAGE_CREATE", BuildEvent(MessageCreateReceived) },
+                { "VOICE_SERVER_UPDATE", BuildEvent(VoiceServerUpdateReceived) },
+                { "VOICE_STATE_UPDATE", BuildEvent(VoiceStateUpdateReceived) },
+                { "USER_UPDATE", BuildEvent(UserUpdateReceived) },
+                { "WEBHOOKS_UPDATE", BuildEvent(WebhooksUpdateReceived) },
+                { "PRESENCE_UPDATE", BuildEvent(PresenceUpdateReceived) }
+            };
         }
 
-        public delegate Task HelloReceivedHandler(object sender, DataPayload<HelloData> payload);
-        public event HelloReceivedHandler HelloReceived;
+        private delegate Task DispatchEventHandler(Dictionary<string, object> data, CancellationToken cancellationToken);
+        public delegate Task GatewayEventHandler<T>(object sender, T payload, CancellationToken cancellationToken);
 
-        public delegate Task HeartbeatReceiedHandler(object sender, Payload.Payload payload);
-        public event HeartbeatReceiedHandler HeartbeatReceived;
+        public event GatewayEventHandler<GatewayDataPayload<Hello>> HelloReceived;
+        public event GatewayEventHandler<GatewayDataPayload<int?>> HeartbeatReceived;
+        public event GatewayEventHandler<GatewayPayload> HeartbeatAckReceived;
 
-        public delegate Task HeartbeatAckReceivedHandler(object sender, Payload.Payload payload);
-        public event HeartbeatAckReceivedHandler HeartbeatAckReceived;
-
-        public delegate Task NewSequenceNumberHandler(object sender, int sequenceNumber);
-        public event NewSequenceNumberHandler NewSequenceNumber;
-
-        public delegate Task ReadyReceivedHandler(object sender, DataPayload<ReadyEventData> readyPayload);
-        public event ReadyReceivedHandler ReadyReceived;
-
-        public delegate Task TypingStartReceivedHandler(object sender, DataPayload<TypingStartEventData> typingStartEventPayload);
-        public event TypingStartReceivedHandler TypingStartReceived;
-
-        public delegate Task GuildCreateReceivedHandler(object sender, DataPayload<TypingStartEventData> typingStartEventPayload);
-        public event GuildCreateReceivedHandler GuildCreateReceived;
-
-        public delegate Task MessageCreateReceivedHandler(object sender, DataPayload<Message> messageCreatePayload);
-        public event MessageCreateReceivedHandler MessageCreateReceived;
+        public event GatewayEventHandler<GatewayDataPayload<Ready>> ReadyReceived;
+        public event GatewayEventHandler<GatewayDataPayload<TypingStart>> TypingStartReceived;
+        public event GatewayEventHandler<GatewayDataPayload<Guild>> GuildCreateReceived;
+        public event GatewayEventHandler<GatewayDataPayload<Message>> MessageCreateReceived;
+        public event GatewayEventHandler<GatewayDataPayload<VoiceServerUpdate>> VoiceServerUpdateReceived;
+        public event GatewayEventHandler<GatewayDataPayload<VoiceState>> VoiceStateUpdateReceived;
+        public event GatewayEventHandler<GatewayDataPayload<User>> UserUpdateReceived;
+        public event GatewayEventHandler<GatewayDataPayload<WebhooksUpdate>> WebhooksUpdateReceived;
+        public event GatewayEventHandler<GatewayDataPayload<PresenceUpdate>> PresenceUpdateReceived;
     }
 }

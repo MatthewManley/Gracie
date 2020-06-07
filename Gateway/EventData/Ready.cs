@@ -1,17 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Gracie.ETF;
+﻿using Gracie.ETF;
 using Gracie.Models;
-using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 
-namespace Gracie.Gateway.Payload.Dispatch
+namespace Gracie.Gateway.EventData
 {
     /// <summary>
     /// https://discord.com/developers/docs/topics/gateway#ready
     /// </summary>
-    public class ReadyEventData
+    public class Ready
     {
         [EtfProperty("application")]
         public Application Application { get; set; }

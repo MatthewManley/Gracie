@@ -1,6 +1,4 @@
 ﻿using Gracie.ETF;
-using Gracie.Gateway.Payload;
-using Gracie.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections;
@@ -24,36 +22,6 @@ namespace Gracie.Gateway
             this.logger = logger;
             this.textEncoding = textEncoding;
         }
-
-        //public T DeserializePayload<T>(List<(string, object)> data, int? sequenceNumber, string eventName) where T : Payload.Payload
-        //{
-        //    var type = typeof(T);
-        //    return (T)DeserializePayload(type, data, sequenceNumber, eventName);
-        //}
-
-        //public object DeserializePayload(Type t, List<(string, object)> data, int? sequenceNumber, string eventName)
-        //{
-        //    if (t.IsGenericType)
-        //    {
-        //        var subType = t.GenericTypeArguments.First();
-        //        var trace = new StringBuilder().Append(t.Name).Append('<').Append(subType.Name).Append('>');
-        //        var subInstance = Deserialize(subType, data, trace);
-        //        var instance = Activator.CreateInstance(t, subInstance, sequenceNumber, eventName);
-        //        return instance;
-        //    }
-        //    else
-        //    {
-        //        var trace = new StringBuilder().Append(t.Name);
-        //        var instance = Activator.CreateInstance(t, sequenceNumber, eventName);
-        //        if (data == null)
-        //        {
-        //            return instance;
-        //        }
-        //        return Deserialize(t, data, instance, trace);
-        //    }
-        //}
-
-
 
         public T Deserialize<T>(Dictionary<string, object> data)
         {
@@ -117,13 +85,13 @@ namespace Gracie.Gateway
         private bool HandleTypes(Type t, object value, StringBuilder trace, ref object result)
         {
             var nexts = HandleOrder().GetEnumerator();
-            return nexts.MoveNext() ? nexts.Current(t, value, trace, ref result, nexts) : false;
+            return nexts.MoveNext() && nexts.Current(t, value, trace, ref result, nexts);
         }
 
         [DebuggerStepThrough]
         private static bool NextHelper(Type t, object value, StringBuilder trace, ref object result, IEnumerator<Handle> nexts)
         {
-            return nexts.MoveNext() ? nexts.Current(t, value, trace, ref result, nexts) : false;
+            return nexts.MoveNext() && nexts.Current(t, value, trace, ref result, nexts);
         }
 
         private static bool HandleBigIntToUlong(Type t, object value, StringBuilder trace, ref object result, IEnumerator<Handle> nexts)

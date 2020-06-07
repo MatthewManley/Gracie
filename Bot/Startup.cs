@@ -1,6 +1,7 @@
-﻿using Gracie.Gateway;
-using Gracie.Gateway.Payload;
-using Gracie.Gateway.Payload.Dispatch;
+﻿using Gracie.Core;
+using Gracie.Gateway;
+using Gracie.Gateway.EventData;
+using Gracie.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -25,6 +26,7 @@ namespace Bot
         public IConfiguration Configuration { get; }
         public IServiceProvider Services { get; }
         public IHostEnvironment Environment { get; }
+        private const int MaxSendPayload = 4096;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -37,81 +39,109 @@ namespace Bot
             client.ReadyReceived += Client_ReadyReceived;
             client.TypingStartReceived += Client_TypingStartReceived1;
             client.MessageCreateReceived += Client_MessageCreateReceived;
+            client.VoiceServerUpdateReceived += Client_VoiceServerUpdateReceived;
             var uri = new Uri("wss://gateway.discord.gg/?v=6&encoding=etf"); //TODO: this shouldn't be hardcoded, it should come from the rest api
-            await client.Connect(uri);
+            await client.ConnectAsync(uri);
             await client.Recieve();
         }
 
-        private Task Client_TypingStartReceived1(object sender, DataPayload<TypingStartEventData> typingStartEventPayload)
+        private Task Client_VoiceServerUpdateReceived(object sender, GatewayDataPayload<VoiceServerUpdate> voiceServerUpdatePayload, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        private Task Client_TypingStartReceived1(object sender, DataPayload<TypingStart> typingStartEventPayload, CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
         }
 
-        private Task Client_ReadyReceived(object sender, DataPayload<ReadyEventData> readyPayload)
+        private Task Client_ReadyReceived(object sender, DataPayload<Ready> readyPayload, CancellationToken cancellationToken)
         {
             logger.LogInformation("Ready Recieved");
             return Task.CompletedTask;
         }
 
-        private Task Client_MessageCreateReceived(object sender, DataPayload<Gracie.Models.Message> messageCreatePayload)
+        private async Task Client_MessageCreateReceived(object sender, DataPayload<Gracie.Models.Message> messageCreatePayload, CancellationToken cancellationToken)
         {
-            logger.Log(LogLevel.Information, messageCreatePayload.Data.Content);
-            return Task.CompletedTask;
+            //logger.Log(LogLevel.Information, messageCreatePayload.Data.Content);
+            if (ulong.TryParse(messageCreatePayload.Data.Content, out var result))
+            {
+                await SendVoiceServerUpdate(messageCreatePayload.Data.GuildId.Value, result, cancellationToken);
+            }
+            var content = Convert.ToUInt64(messageCreatePayload.Data.Content);
         }
 
         public GatewayClient client;
         public int? lastSequenceNumber = null;
         private readonly ILogger<Startup> logger;
 
-        private Task Client_NewSequenceNumber(object sender, int sequenceNumber)
+        private Task Client_NewSequenceNumber(object sender, int sequenceNumber, CancellationToken cancellation)
         {
             lastSequenceNumber = sequenceNumber;
             return Task.CompletedTask;
         }
 
-        private Task Client_HeartbeatAckRecieved(object sender, Payload payload)
+        private Task Client_HeartbeatAckRecieved(object sender, Payload payload, CancellationToken cancellationToken)
         {
             logger.LogInformation("Heartbeat ACK Recieved");
             return Task.CompletedTask;
         }
 
-        private async Task HelloRecievedSendIdentify(object sender, DataPayload<HelloData> payload)
+        private async Task HelloRecievedSendIdentify(object sender, DataPayload<Hello> payload, CancellationToken cancellationToken)
         {
             logger.LogInformation("Hello Recieved");
-            await SendHeartbeat();
-            await client.Send(new DataPayload<IdentifyData>
+            await SendHeartbeat(cancellationToken);
+            var sendPayload = new GatewayDataPayload<Identify>
             {
-                Data = new IdentifyData
+                Data = new Identify
                 {
                     GuildSubscriptions = false,
-                    Intents = Intent.GuildMessages | Intent.DirectMessages,
+                    Intents = Intent.GuildMessages | Intent.DirectMessages | Intent.GuildVoiceStates,
                     Token = Configuration["discordtoken"]
                 },
-                Opcode = Opcode.Identify
-            });
+                GatewayOpcode = Opcode.Identify
+            };
+            await client.SendPayload(sendPayload, MaxSendPayload, cancellationToken);
         }
 
-        private async Task SendHeartbeat()
+        private async Task SendHeartbeat(CancellationToken cancellationToken)
         {
             logger.LogInformation("Sending heartbeat");
-            await client.Send(new DataPayload<int?>
+            var dataPayload = new GatewayDataPayload<int?>
             {
                 Data = lastSequenceNumber,
-                Opcode = Opcode.Heartbeat,
-            });
+                GatewayOpcode = Opcode.Heartbeat,
+            };
+            await client.SendPayload(dataPayload, MaxSendPayload, cancellationToken);
         }
 
-        private Task HelloRecievedSetupHeartbeat(object sender, DataPayload<HelloData> payload)
+        private Task HelloRecievedSetupHeartbeat(object sender, DataPayload<Hello> payload, CancellationToken cancellationToken)
         {
             var heartbeat = Task.Run(async delegate
             {
                 while (true)
                 {
                     await Task.Delay(payload.Data.HeartbeatInterval);
-                    await SendHeartbeat();
+                    await SendHeartbeat(cancellationToken);
                 }
             });
             return Task.CompletedTask;
+        }
+
+        private async Task SendVoiceServerUpdate(ulong guildId, ulong channelId, CancellationToken cancellationToken)
+        {
+            var sendPayload = new GatewayDataPayload<VoiceState>
+            {
+                GatewayOpcode = Opcode.VoiceStateUpdate,
+                Data = new VoiceState
+                {
+                    GuildId = guildId,
+                    ChannelId = channelId,
+                    SelfMute = false,
+                    SelfDeaf = false,
+                }
+            };
+            await client.SendPayload(sendPayload, MaxSendPayload, cancellationToken);
         }
     }
 }
