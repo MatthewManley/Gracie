@@ -84,7 +84,8 @@ namespace Gracie.Gateway
             }
         }
 
-
+        // we pass in a function that returns the event rather the event itself otherwise
+        // the eventis always null as its passed in before we subscribe
         private DispatchEventHandler BuildEvent<T>(Func<GatewayEventHandler<T>> eventGetter)
         {
             return async (Dictionary<string, object> data, CancellationToken cancellationToken) =>
