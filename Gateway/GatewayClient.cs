@@ -85,7 +85,7 @@ namespace Gracie.Gateway
         }
 
         // we pass in a function that returns the event rather the event itself otherwise
-        // the eventis always null as its passed in before we subscribe
+        // the event is always null as its passed in before we subscribe
         private DispatchEventHandler BuildEvent<T>(Func<GatewayEventHandler<T>> eventGetter)
         {
             return async (Dictionary<string, object> data, CancellationToken cancellationToken) =>
@@ -113,7 +113,8 @@ namespace Gracie.Gateway
                 { "WEBHOOKS_UPDATE", BuildEvent(() => WebhooksUpdateReceived) },
                 { "PRESENCE_UPDATE", BuildEvent(() => PresenceUpdateReceived) },
                 { "MESSAGE_DELETE", BuildEvent(() => MessageDeleteReceived) },
-                { "MESSAGE_DELETE_BULK", BuildEvent(() => MessageDeleteBulkReceived) }
+                { "MESSAGE_DELETE_BULK", BuildEvent(() => MessageDeleteBulkReceived) },
+                { "MESSAGE_UPDATE", BuildEvent(() => MessageUpdateReceived) }
             };
         }
 
@@ -135,5 +136,6 @@ namespace Gracie.Gateway
         public event GatewayEventHandler<GatewayDataPayload<PresenceUpdate>> PresenceUpdateReceived;
         public event GatewayEventHandler<GatewayDataPayload<MessageDelete>> MessageDeleteReceived;
         public event GatewayEventHandler<GatewayDataPayload<MessageDeleteBulk>> MessageDeleteBulkReceived;
+        public event GatewayEventHandler<GatewayDataPayload<Message>> MessageUpdateReceived;
     }
 }
